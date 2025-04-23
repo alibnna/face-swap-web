@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>FaceDancer Swap</title>
+  <script type="module" src="script.js"></script>
+</head>
+<body>
+  <h1>Face Swap Web App</h1>
+  
+  <label>Target Image:</label><br>
+  <input type="file" id="targetInput"><br><br>
+
+  <label>Source Image:</label><br>
+  <input type="file" id="sourceInput"><br><br>
+
+  <label>Anonymization Ratio (%):</label>
+  <input type="number" id="anonInput" value="0" min="0" max="100"><br><br>
+
+  <label>Adversarial Defense Ratio (%):</label>
+  <input type="number" id="advInput" value="0" min="0" max="100"><br><br>
+
+  <button id="swapBtn">Swap Faces</button>
+
+  <h3>Result:</h3>
+  <img id="resultImg" style="max-width: 400px; display: none;">
+</body>
+</html>
