@@ -18,16 +18,14 @@ async function handleFaceSwap() {
     currentController?.abort();
     currentController = new AbortController();
 
-    // Get input values
+    // Get and validate inputs
     const targetFile = document.getElementById("targetInput").files[0];
     const sourceFile = document.getElementById("sourceInput").files[0];
     const anon = parseInt(document.getElementById("anonInput").value);
     const adv = parseInt(document.getElementById("advInput").value);
 
-    // Validate inputs
     if (!targetFile || !sourceFile) throw new Error("Please upload both images!");
-    if (isNaN(anon) || anon < 0 || anon > 100 || 
-        isNaN(adv) || adv < 0 || adv > 100) {
+    if ([anon, adv].some(v => isNaN(v) || v < 0 || v > 100)) {
       throw new Error("Please enter valid values (0-100) for ratios!");
     }
 
@@ -36,11 +34,11 @@ async function handleFaceSwap() {
     loading.style.display = "block";
     queueStatus.innerHTML = "Connecting to API...";
 
-    // Create Blobs with proper MIME types
+    // Prepare files
     const targetBlob = new Blob([targetFile], { type: targetFile.type });
     const sourceBlob = new Blob([sourceFile], { type: sourceFile.type });
 
-    // Make API call with progress handling
+    // Make API call
     const result = await app.predict("/run_inference", [
       targetBlob,
       sourceBlob,
@@ -48,19 +46,29 @@ async function handleFaceSwap() {
       adv,
       ["Compare"]
     ], {
-      onProgress: (progress) => {
-        console.log("API Progress:", progress);
-        handleProgressUpdate(progress);
-      },
+      onProgress: handleProgressUpdate,
       signal: currentController.signal
     });
 
-    // Handle final response
-    if (result?.data?.error) {
-      throw new Error(result.data.error || "Unknown error occurred");
+    // Handle API response
+    if (!result || typeof result !== "object") {
+      throw new Error("Invalid API response format");
     }
 
-    handleImageResponse(result.data);
+    // Check for API errors
+    if (result?.data?.error) {
+      throw new Error(result.data.error);
+    }
+
+    // Validate and process image data
+    if (typeof result.data === "string") {
+      handleImageResponse(result.data);
+    } else if (result.data?.data) {
+      handleImageResponse(result.data.data);
+    } else {
+      console.error("Unexpected response structure:", result);
+      throw new Error("Failed to process images - unexpected response format");
+    }
 
   } catch (error) {
     handleError(error);
@@ -71,6 +79,8 @@ async function handleFaceSwap() {
 }
 
 function handleProgressUpdate(progress) {
+  if (!progress) return;
+  
   switch (progress.msg) {
     case "estimation":
       queueStatus.innerHTML = `
@@ -90,34 +100,58 @@ function handleProgressUpdate(progress) {
 }
 
 function handleImageResponse(data) {
-  if (!data) throw new Error("No image data received");
+  if (!data) {
+    throw new Error("Received empty image data");
+  }
+
+  let imageData;
   
-  // Handle different response formats
-  const imageData = data.startsWith("data:image") ? data : 
-                   typeof data === "string" ? `data:image/png;base64,${data}` : 
-                   URL.createObjectURL(new Blob([data], { type: "image/png" }));
+  if (typeof data === "string") {
+    // Handle base64 string
+    imageData = data.startsWith("data:image") ? data : 
+               `data:image/png;base64,${data}`;
+  } else if (data instanceof Blob) {
+    // Handle Blob response
+    imageData = URL.createObjectURL(data);
+  } else {
+    console.error("Unexpected image data type:", typeof data);
+    throw new Error("Unsupported image format received");
+  }
 
   resultImg.onload = () => {
     resultSection.style.display = "block";
-    URL.revokeObjectURL(imageData); // Clean up if using object URL
+    if (imageData.startsWith("blob:")) {
+      URL.revokeObjectURL(imageData);
+    }
   };
+  
+  resultImg.onerror = () => {
+    throw new Error("Failed to load result image");
+  };
+
   resultImg.src = imageData;
 }
 
 function handleError(error) {
   console.error("Error:", error);
   errorMsg.textContent = error.message.replace("Error: ", "");
-  errorMsg.style.display = "block";
   
-  if (error.message.includes("aborted")) return;
-  if (error.message.includes("queue")) {
-    errorMsg.textContent += " - Please try again in a few moments";
+  // Handle specific error cases
+  if (error.message.includes("aborted")) {
+    errorMsg.textContent = "Request canceled";
   }
+  else if (error.message.includes("queue")) {
+    errorMsg.textContent += " - Server busy, please try again later";
+  }
+  else if (error.message.includes("face")) {
+    errorMsg.textContent += " - Could not detect faces in images";
+  }
+  
+  errorMsg.style.display = "block";
 }
 
-// Event Listeners
+// Event listeners (same as previous version)
 swapBtn.addEventListener("click", handleFaceSwap);
-
 document.querySelectorAll('input[type="number"]').forEach(input => {
   input.addEventListener("input", (e) => {
     let value = parseInt(e.target.value);
@@ -125,8 +159,6 @@ document.querySelectorAll('input[type="number"]').forEach(input => {
     if (value > 100) e.target.value = 100;
   });
 });
-
-// Cancel ongoing request if page is hidden
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden") {
     currentController?.abort();
