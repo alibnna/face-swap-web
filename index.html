@@ -2,27 +2,49 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>FaceDancer Swap</title>
-  <script type="module" src="script.js"></script>
+  <meta http-equiv="Content-Security-Policy" content="default-src * self blob: data: gap:; style-src * self 'unsafe-inline' blob: data: gap:; script-src * 'self' 'unsafe-eval' 'unsafe-inline' blob: data: gap:; object-src * 'self' blob: data: gap:; img-src * self 'unsafe-inline' blob: data: gap:; connect-src * self 'unsafe-inline' blob: data: gap:; frame-src * self blob: data: gap:;">
+  <title>FaceSwap Pro</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+    .input-group { margin-bottom: 15px; }
+    input[type="file"] { margin-top: 5px; }
+    #loading { display: none; color: blue; margin: 10px 0; }
+    #resultImg { max-width: 100%; margin-top: 20px; border: 1px solid #ddd; }
+    button { padding: 10px 20px; background: #007bff; color: white; border: none; cursor: pointer; }
+    button:disabled { background: #cccccc; }
+  </style>
 </head>
 <body>
-  <h1>Face Swap Web App</h1>
+  <h1>FaceSwap Pro</h1>
   
-  <label>Target Image:</label><br>
-  <input type="file" id="targetInput"><br><br>
+  <div class="input-group">
+    <label>Target Image (Face to Replace):</label>
+    <input type="file" id="targetInput" accept="image/*">
+  </div>
 
-  <label>Source Image:</label><br>
-  <input type="file" id="sourceInput"><br><br>
+  <div class="input-group">
+    <label>Source Image (Face to Use):</label>
+    <input type="file" id="sourceInput" accept="image/*">
+  </div>
 
-  <label>Anonymization Ratio (%):</label>
-  <input type="number" id="anonInput" value="0" min="0" max="100"><br><br>
+  <div class="input-group">
+    <label>Anonymization Ratio (%):</label>
+    <input type="number" id="anonInput" value="0" min="0" max="100">
+  </div>
 
-  <label>Adversarial Defense Ratio (%):</label>
-  <input type="number" id="advInput" value="0" min="0" max="100"><br><br>
+  <div class="input-group">
+    <label>Adversarial Defense Ratio (%):</label>
+    <input type="number" id="advInput" value="0" min="0" max="100">
+  </div>
 
+  <div id="loading">Processing... Please wait</div>
   <button id="swapBtn">Swap Faces</button>
 
-  <h3>Result:</h3>
-  <img id="resultImg" style="max-width: 400px; display: none;">
+  <div id="resultSection" style="display: none;">
+    <h3>Result:</h3>
+    <img id="resultImg">
+  </div>
+
+  <script type="module" src="script.js"></script>
 </body>
 </html>
