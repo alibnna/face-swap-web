@@ -3,15 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy" content="default-src * self blob: data: gap:; style-src * self 'unsafe-inline' blob: data: gap:; script-src * 'self' 'unsafe-eval' 'unsafe-inline' blob: data: gap:; object-src * 'self' blob: data: gap:; img-src * self 'unsafe-inline' blob: data: gap:; connect-src * self 'unsafe-inline' blob: data: gap:; frame-src * self blob: data: gap:;">
-  <title>FaceSwap Pro</title>
+  <title>FaceSwap Pro v2</title>
   <style>
     body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
     .input-group { margin-bottom: 15px; }
-    input[type="file"] { margin-top: 5px; }
-    #loading { display: none; color: blue; margin: 10px 0; }
-    #resultImg { max-width: 100%; margin-top: 20px; border: 1px solid #ddd; }
-    button { padding: 10px 20px; background: #007bff; color: white; border: none; cursor: pointer; }
-    button:disabled { background: #cccccc; }
+    input[type="file"] { margin-top: 5px; display: block; }
+    #loading { display: none; margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 5px; }
+    #resultImg { max-width: 100%; margin-top: 20px; border: 1px solid #ddd; border-radius: 5px; }
+    button { padding: 10px 25px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; transition: background 0.3s; }
+    button:hover { background: #0056b3; }
+    button:disabled { background: #6c757d; cursor: not-allowed; }
+    .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 10px auto; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .error { color: #dc3545; background: #f8d7da; padding: 10px; border-radius: 5px; margin: 10px 0; display: none; }
+    .queue-info { margin-top: 10px; color: #0d6efd; }
   </style>
 </head>
 <body>
@@ -37,8 +42,13 @@
     <input type="number" id="advInput" value="0" min="0" max="100">
   </div>
 
-  <div id="loading">Processing... Please wait</div>
+  <div id="loading">
+    <div class="loader"></div>
+    <div class="queue-info" id="queueStatus"></div>
+  </div>
+  
   <button id="swapBtn">Swap Faces</button>
+  <div class="error" id="errorMsg"></div>
 
   <div id="resultSection" style="display: none;">
     <h3>Result:</h3>
