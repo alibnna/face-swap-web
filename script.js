@@ -1,32 +1,31 @@
 import { Client } from "https://esm.sh/@gradio/client";
 
-// Initialize UI elements
+const app = await Client.connect("felixrosberg/face-swap");
 const swapBtn = document.getElementById("swapBtn");
 const loading = document.getElementById("loading");
 const resultSection = document.getElementById("resultSection");
 const resultImg = document.getElementById("resultImg");
+const errorMsg = document.getElementById("errorMsg");
+const queueStatus = document.getElementById("queueStatus");
 
-// Convert File to Base64
-const fileToBase64 = (file) => new Promise((resolve, reject) => {
-  const reader = new FileReader();
-  reader.readAsDataURL(file);
-  reader.onload = () => resolve(reader.result);
-  reader.onerror = error => reject(error);
-});
+let currentController = null;
 
-// Handle API call
 async function handleFaceSwap() {
   try {
-    // Validate inputs
+    // Reset state
+    errorMsg.style.display = "none";
+    resultSection.style.display = "none";
+    currentController?.abort();
+    currentController = new AbortController();
+
+    // Get input values
     const targetFile = document.getElementById("targetInput").files[0];
     const sourceFile = document.getElementById("sourceInput").files[0];
     const anon = parseInt(document.getElementById("anonInput").value);
     const adv = parseInt(document.getElementById("advInput").value);
 
-    if (!targetFile || !sourceFile) {
-      throw new Error("Please upload both images!");
-    }
-
+    // Validate inputs
+    if (!targetFile || !sourceFile) throw new Error("Please upload both images!");
     if (isNaN(anon) || anon < 0 || anon > 100 || 
         isNaN(adv) || adv < 0 || adv > 100) {
       throw new Error("Please enter valid values (0-100) for ratios!");
@@ -35,58 +34,101 @@ async function handleFaceSwap() {
     // Show loading state
     swapBtn.disabled = true;
     loading.style.display = "block";
-    resultSection.style.display = "none";
+    queueStatus.innerHTML = "Connecting to API...";
 
-    // Convert files to Base64
-    const [targetBase64, sourceBase64] = await Promise.all([
-      fileToBase64(targetFile),
-      fileToBase64(sourceFile)
-    ]);
+    // Create Blobs with proper MIME types
+    const targetBlob = new Blob([targetFile], { type: targetFile.type });
+    const sourceBlob = new Blob([sourceFile], { type: sourceFile.type });
 
-    // Connect to Gradio API
-    const app = await Client.connect("felixrosberg/face-swap");
-    
-    // Make prediction
+    // Make API call with progress handling
     const result = await app.predict("/run_inference", [
-      { data: targetBase64, name: "target.png" },
-      { data: sourceBase64, name: "source.png" },
+      targetBlob,
+      sourceBlob,
       anon,
       adv,
       ["Compare"]
-    ]);
+    ], {
+      onProgress: (progress) => {
+        console.log("API Progress:", progress);
+        handleProgressUpdate(progress);
+      },
+      signal: currentController.signal
+    });
 
-    // Handle response
-    if (!result?.data) {
-      throw new Error("No response data from API");
+    // Handle final response
+    if (result?.data?.error) {
+      throw new Error(result.data.error || "Unknown error occurred");
     }
 
-    const imageData = result.data;
-    console.log("Received image data:", imageData);
+    handleImageResponse(result.data);
 
-    if (typeof imageData === "string" && imageData.startsWith("data:image")) {
-      resultImg.src = imageData;
-      resultSection.style.display = "block";
-    } else {
-      throw new Error("Invalid image format received from API");
-    }
   } catch (error) {
-    console.error("Face swap error:", error);
-    alert(`Error: ${error.message}`);
+    handleError(error);
   } finally {
-    // Reset UI state
     swapBtn.disabled = false;
     loading.style.display = "none";
   }
 }
 
-// Event listeners
-document.getElementById("swapBtn").addEventListener("click", handleFaceSwap);
+function handleProgressUpdate(progress) {
+  switch (progress.msg) {
+    case "estimation":
+      queueStatus.innerHTML = `
+        Queue position: ${progress.queue_size + 1}<br>
+        Estimated wait time: ${Math.round(progress.rank_eta)}s
+      `;
+      break;
+    case "process_starts":
+      queueStatus.innerHTML = `Processing started (ETA: ${Math.round(progress.eta)}s)`;
+      break;
+    case "process_completed":
+      if (!progress.success) {
+        throw new Error(progress.output?.error || "Processing failed");
+      }
+      break;
+  }
+}
 
-// Input validation for number fields
+function handleImageResponse(data) {
+  if (!data) throw new Error("No image data received");
+  
+  // Handle different response formats
+  const imageData = data.startsWith("data:image") ? data : 
+                   typeof data === "string" ? `data:image/png;base64,${data}` : 
+                   URL.createObjectURL(new Blob([data], { type: "image/png" }));
+
+  resultImg.onload = () => {
+    resultSection.style.display = "block";
+    URL.revokeObjectURL(imageData); // Clean up if using object URL
+  };
+  resultImg.src = imageData;
+}
+
+function handleError(error) {
+  console.error("Error:", error);
+  errorMsg.textContent = error.message.replace("Error: ", "");
+  errorMsg.style.display = "block";
+  
+  if (error.message.includes("aborted")) return;
+  if (error.message.includes("queue")) {
+    errorMsg.textContent += " - Please try again in a few moments";
+  }
+}
+
+// Event Listeners
+swapBtn.addEventListener("click", handleFaceSwap);
+
 document.querySelectorAll('input[type="number"]').forEach(input => {
   input.addEventListener("input", (e) => {
     let value = parseInt(e.target.value);
     if (value < 0) e.target.value = 0;
     if (value > 100) e.target.value = 100;
   });
+});
+
+// Cancel ongoing request if page is hidden
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") {
+    currentController?.abort();
+  }
 });
